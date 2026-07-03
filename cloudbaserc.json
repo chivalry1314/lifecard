@@ -1,0 +1,19 @@
+{
+  "version": "2.0",
+  "envId": "{{env.ENV_ID}}",
+  "functionRoot": "./cloudfunctions",
+  "functions": [
+    {
+      "name": "api",
+      "timeout": 30,
+      "memorySize": 512,
+      "runtime": "Nodejs18.15",
+      "envVariables": {
+        "NODE_ENV": "production",
+        "CLOUDBASE_ENV_ID": "{{env.ENV_ID}}",
+        "CLOUDBASE_API_KEY": "{{env.CLOUDBASE_API_KEY}}",
+        "ALLOWED_ORIGINS": "{{env.ALLOWED_ORIGINS}}"
+      }
+    }
+  ]
+}

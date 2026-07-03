@@ -1,0 +1,83 @@
+@import url('https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Noto+Serif+SC:wght@400;500;600;700;900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 30 40% 97%;
+    --foreground: 15 12% 26%;
+    --card: 0 0% 100%;
+    --card-foreground: 15 12% 26%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 15 12% 26%;
+    --primary: 355 48% 64%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 30 35% 95%;
+    --secondary-foreground: 15 12% 26%;
+    --muted: 30 20% 94%;
+    --muted-foreground: 15 8% 48%;
+    --accent: 30 35% 95%;
+    --accent-foreground: 15 12% 26%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 20 25% 90%;
+    --input: 20 25% 90%;
+    --ring: 355 48% 64%;
+    --radius: 0.625rem;
+    --sidebar-background: 30 40% 97%;
+    --sidebar-foreground: 15 12% 26%;
+    --sidebar-primary: 355 48% 64%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 30 35% 95%;
+    --sidebar-accent-foreground: 15 12% 26%;
+    --sidebar-border: 20 25% 90%;
+    --sidebar-ring: 355 48% 64%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-pawn-cream text-pawn-dark antialiased;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans SC", sans-serif;
+  }
+}
+
+@layer components {
+  .serif-title {
+    font-family: "Noto Serif SC", "Source Han Serif SC", SimSun, serif;
+  }
+
+  .hand-title {
+    font-family: "Ma Shan Zheng", cursive;
+  }
+
+  .pawn-card {
+    background-image: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(250, 244, 239, 0.6) 100%);
+  }
+
+  .card-scroller {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .card-scroller::-webkit-scrollbar {
+    display: none;
+  }
+
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+}
+
+@layer utilities {
+  .line-clamp-4 {
+    display: -webkit-box;
+    -webkit-line-clamp: 4;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+}
