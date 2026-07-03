@@ -56,6 +56,13 @@ export const roomRouter = createRouter({
         throwAppError(Errors.badRequest("至少需要 2 名玩家才能开始游戏"));
       }
 
+      const notReady = players.filter((p) => p.baseCards.length !== 10);
+      if (notReady.length > 0) {
+        throwAppError(
+          Errors.badRequest(`还有 ${notReady.length} 位玩家未选择初始底牌`)
+        );
+      }
+
       const currentEvent = getRandomEvent(0);
       await updateRoomStatus(input.roomId, {
         status: "playing",

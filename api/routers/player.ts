@@ -2,6 +2,7 @@ import { z } from "zod";
 import { createRouter, publicProcedure, throwAppError } from "../middleware";
 import {
   createPlayer,
+  updatePlayerBaseCards,
   getRoom,
   getPlayer,
   listPlayersByRoom,
@@ -15,6 +16,17 @@ import { nameSchema, roomIdSchema } from "../lib/schemas";
 const cardSchema = z
   .array(z.string())
   .length(2, "必须选择 2 张卡牌")
+  .refine(
+    (cards) => cards.every((card) => ALL_CARDS.includes(card as never)),
+    { message: "包含无效的卡牌" }
+  );
+
+const initialCardsSchema = z
+  .array(z.string())
+  .length(10, "必须选择 10 张卡牌")
+  .refine((cards) => new Set(cards).size === cards.length, {
+    message: "卡牌不能重复",
+  })
   .refine(
     (cards) => cards.every((card) => ALL_CARDS.includes(card as never)),
     { message: "包含无效的卡牌" }
@@ -39,6 +51,44 @@ export const playerRouter = createRouter({
       }
       const player = await createPlayer(input.roomId, input.playerName);
       return { playerId: player._id, playerToken: player.playerToken };
+    }),
+
+  // Select initial 10 cards from the 18-card pool
+  selectCards: publicProcedure
+    .input(
+      z.object({
+        roomId: roomIdSchema,
+        playerName: nameSchema,
+        playerToken: z.string().min(1, "玩家令牌不能为空"),
+        cards: initialCardsSchema,
+      })
+    )
+    .mutation(async ({ input }) => {
+      const room = await getRoom(input.roomId);
+      if (!room) {
+        throwAppError(Errors.notFound("房间不存在"));
+      }
+      if (room.status !== "waiting") {
+        throwAppError(Errors.badRequest("游戏已经开始，无法选择底牌"));
+      }
+
+      const player = await getPlayer(input.roomId, input.playerName);
+      if (!player) {
+        throwAppError(Errors.notFound("玩家不存在"));
+      }
+      if (player.playerToken !== input.playerToken) {
+        throwAppError(Errors.forbidden("玩家身份验证失败"));
+      }
+      if (player.baseCards.length > 0) {
+        throwAppError(Errors.badRequest("你已经选择过初始底牌"));
+      }
+
+      await updatePlayerBaseCards(
+        input.roomId,
+        input.playerName,
+        input.cards
+      );
+      return { success: true };
     }),
 
   // Get player by roomId and playerName (requires player token)

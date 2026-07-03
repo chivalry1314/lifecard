@@ -5,7 +5,7 @@
  */
 
 import type { RoomDoc, PlayerDoc } from "./cloudbase";
-import { generateRoomId, generateToken, dealCards } from "./cloudbase";
+import { generateRoomId, generateToken } from "./cloudbase";
 
 const rooms = new Map<string, RoomDoc>();
 const players = new Map<string, PlayerDoc>();
@@ -67,7 +67,7 @@ export async function createPlayer(
     roomId,
     playerName,
     playerToken: generateToken(),
-    baseCards: dealCards(),
+    baseCards: [],
     pawnedCards: [],
     acceptedEvents: 0,
     lastActionAtStage: -1,
@@ -78,6 +78,20 @@ export async function createPlayer(
   };
 
   players.set(key, player);
+  return player;
+}
+
+export async function updatePlayerBaseCards(
+  roomId: string,
+  playerName: string,
+  cards: string[]
+): Promise<PlayerDoc> {
+  const player = await getPlayer(roomId, playerName);
+  if (!player) {
+    throw new Error("Player not found");
+  }
+  player.baseCards = cards;
+  player.updatedAt = new Date();
   return player;
 }
 

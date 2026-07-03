@@ -13,7 +13,7 @@ import {
   getRecentRooms,
   addRecentRoom,
 } from "@/lib/recent-rooms";
-import { getCardDesc } from "@/lib/cards";
+import { getCardDesc, ALL_CARDS } from "@/lib/cards";
 import type { RoomPlayer } from "@/components/room/types";
 
 interface ConfirmModalState {
@@ -44,6 +44,7 @@ export default function Room() {
     return recent?.playerToken || "";
   });
   const [selectedCards, setSelectedCards] = useState<string[]>([]);
+  const [initialSelectedCards, setInitialSelectedCards] = useState<string[]>([]);
   const [pawnMode, setPawnMode] = useState(false);
   const [modal, setModal] = useState<ConfirmModalState>({
     open: false,
@@ -109,6 +110,18 @@ export default function Room() {
     },
     onError: (err) => {
       error("加入失败", err.message);
+    },
+  });
+
+  const selectCardsMutation = trpc.player.selectCards.useMutation({
+    onSuccess: () => {
+      playerQuery.refetch();
+      playersQuery.refetch();
+      setInitialSelectedCards([]);
+      success("初始底牌已锁定", "你已选定陪伴一生的 10 张珍宝");
+    },
+    onError: (err) => {
+      error("选择底牌失败", err.message);
     },
   });
 
@@ -334,6 +347,35 @@ export default function Room() {
     [pawnMode]
   );
 
+  const toggleInitialCard = useCallback((card: string) => {
+    setInitialSelectedCards((prev) => {
+      if (prev.includes(card)) {
+        return prev.filter((c) => c !== card);
+      }
+      if (prev.length >= 10) {
+        return [...prev.slice(1), card];
+      }
+      return [...prev, card];
+    });
+  }, []);
+
+  const confirmInitialCards = useCallback(() => {
+    if (initialSelectedCards.length !== 10 || !playerToken) return;
+    setModal({
+      open: true,
+      title: "锁定初始底牌",
+      body: `你选择了：${initialSelectedCards.join("、")}。一旦锁定将无法更改，确定以此开启人生旅程吗？`,
+      onConfirm: () => {
+        selectCardsMutation.mutate({
+          roomId: roomId!,
+          playerName,
+          playerToken,
+          cards: initialSelectedCards,
+        });
+      },
+    });
+  }, [initialSelectedCards, playerToken, roomId, playerName, selectCardsMutation]);
+
   const confirmPawn = useCallback(() => {
     if (selectedCards.length !== 2 || !playerToken) return;
     const cardNames = selectedCards.join("、");
@@ -450,7 +492,16 @@ export default function Room() {
           room.status === "playing" ? "pb-[200px] sm:pb-[220px]" : "pb-10"
         }`}
       >
-        {room.status === "waiting" && (
+        {room.status === "waiting" && player && player.baseCards.length === 0 && (
+          <InitialCardSelector
+            selectedCards={initialSelectedCards}
+            onToggle={toggleInitialCard}
+            onConfirm={confirmInitialCards}
+            isPending={selectCardsMutation.isPending}
+          />
+        )}
+
+        {room.status === "waiting" && (!player || player.baseCards.length > 0) && (
           <WaitingRoom
             roomId={roomId!}
             hostName={room.hostName}
@@ -569,6 +620,9 @@ function WaitingRoom({
   playerCount,
   isStarting,
 }: WaitingRoomProps) {
+  const allReady = players.length >= 2 && players.every((p) => p.baseCards.length === 10);
+  const canStart = allReady && !isStarting;
+
   return (
     <section className="w-full space-y-5 animate-fade-in">
       <div className="bg-white rounded-3xl p-5 shadow-soft-warm border border-rose-50/50 text-center space-y-4">
@@ -617,6 +671,7 @@ function WaitingRoom({
         <div className="grid grid-cols-2 gap-2.5">
           {players.map((p) => {
             const isSelf = p.playerName === playerName;
+            const isReady = p.baseCards.length === 10;
             return (
               <div
                 key={p.playerName}
@@ -638,7 +693,14 @@ function WaitingRoom({
                     {p.playerName} {isSelf && <span className="text-[9px] text-pawn-clay">(你)</span>}
                   </p>
                   <p className="text-[9px] text-stone-400 truncate">
-                    {p.playerName === hostName ? "🗝️ 掌事房主" : "同游旅人"}
+                    {p.playerName === hostName
+                      ? "🗝️ 掌事房主"
+                      : "同游旅人"}
+                    {isReady ? (
+                      <span className="ml-1 text-emerald-500">✓ 已选底牌</span>
+                    ) : (
+                      <span className="ml-1 text-amber-500">待选底牌</span>
+                    )}
                   </p>
                 </div>
               </div>
@@ -651,24 +713,33 @@ function WaitingRoom({
         <div>
           <button
             onClick={onStart}
-            disabled={isStarting || playerCount < 2}
+            disabled={!canStart}
             className={`w-full py-3.5 font-bold rounded-2xl shadow-lg transition text-sm flex items-center justify-center gap-2 active:scale-95 ${
-              playerCount < 2
-                ? "bg-stone-300 cursor-not-allowed"
-                : "bg-pawn-rose hover:bg-pawn-clay shadow-rose-200 text-white"
+              canStart
+                ? "bg-pawn-rose hover:bg-pawn-clay shadow-rose-200 text-white"
+                : "bg-stone-300 cursor-not-allowed"
             }`}
           >
-            <SparkleIcon /> {playerCount < 2 ? "至少2人才能开始" : "命运轮转，开启当铺游戏"}
+            <SparkleIcon />{" "}
+            {playerCount < 2
+              ? "至少2人才能开始"
+              : allReady
+                ? "命运轮转，开启当铺游戏"
+                : "等待所有人选好底牌"}
           </button>
           <p className="text-[10px] text-center text-pawn-clay mt-2 font-medium">
             {playerCount < 2
               ? "🌸 再邀请一位朋友入座，就可以开启这一生的故事了"
-              : "只有身为房主的你才可以一键开启人生路"}
+              : allReady
+                ? "只有身为房主的你才可以一键开启人生路"
+                : "每位玩家都需要从 18 张卡牌中挑选 10 张初始底牌"}
           </p>
         </div>
       ) : (
         <div className="bg-pawn-cream/50 rounded-2xl p-4 text-center text-xs text-stone-500 font-light border border-stone-200/20">
-          ⌛ 等待主持人开启这一生的故事之旅...
+          {allReady
+            ? "⌛ 等待主持人开启这一生的故事之旅..."
+            : "🃏 还有玩家未选好初始底牌，请稍候..."}
         </div>
       )}
     </section>
@@ -694,6 +765,115 @@ interface ActivePlayProps {
   onRefresh: () => void;
   syncSpin: boolean;
   isNextPending: boolean;
+}
+
+interface InitialCardSelectorProps {
+  selectedCards: string[];
+  onToggle: (card: string) => void;
+  onConfirm: () => void;
+  isPending: boolean;
+}
+
+function InitialCardSelector({
+  selectedCards,
+  onToggle,
+  onConfirm,
+  isPending,
+}: InitialCardSelectorProps) {
+  const remaining = 10 - selectedCards.length;
+
+  return (
+    <section className="w-full space-y-5 animate-fade-in">
+      <div className="bg-white rounded-3xl p-5 shadow-soft-warm border border-rose-50/50 text-center space-y-4">
+        <div className="w-14 h-14 bg-pawn-cream rounded-full flex items-center justify-center mx-auto text-pawn-rose text-xl">
+          <CardsIcon />
+        </div>
+        <div className="space-y-1">
+          <h2 className="serif-title text-xl font-bold text-pawn-dark">挑选你的人生底牌</h2>
+          <p className="text-xs text-stone-500">
+            从 18 张珍贵卡牌中，选出 10 张陪你踏上旅程
+          </p>
+        </div>
+
+        <div
+          className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold ${
+            remaining === 0
+              ? "bg-emerald-50 text-emerald-600"
+              : "bg-amber-50 text-amber-600"
+          }`}
+        >
+          已选 {selectedCards.length} / 10 张
+          {remaining === 0 && <span>✓</span>}
+        </div>
+      </div>
+
+      <div className="bg-white rounded-3xl p-5 shadow-soft-warm border border-rose-50/50 space-y-3.5">
+        <h3 className="text-xs font-bold text-pawn-dark flex items-center gap-1.5">
+          <SparkleIcon />
+          点击选择你认为最珍贵的 10 张底牌
+        </h3>
+        <div className="grid grid-cols-2 gap-2.5">
+          {ALL_CARDS.map((card) => {
+            const isSelected = selectedCards.includes(card);
+            return (
+              <button
+                key={card}
+                onClick={() => onToggle(card)}
+                disabled={isPending}
+                className={`relative p-3 rounded-2xl border text-left transition active:scale-95 ${
+                  isSelected
+                    ? "bg-rose-50 border-pawn-rose shadow-sm shadow-rose-100"
+                    : "bg-stone-50/70 border-stone-200/60 hover:bg-stone-100/50"
+                }`}
+              >
+                <div className="flex items-start justify-between">
+                  <span
+                    className={`text-xs font-bold ${
+                      isSelected ? "text-pawn-rose" : "text-pawn-dark"
+                    }`}
+                  >
+                    {card}
+                  </span>
+                  {isSelected && (
+                    <span className="w-4 h-4 rounded-full bg-pawn-rose text-white flex items-center justify-center text-[10px]">
+                      ✓
+                    </span>
+                  )}
+                </div>
+                <p className="text-[10px] text-stone-400 mt-1 leading-relaxed">
+                  {getCardDesc(card)}
+                </p>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <button
+        onClick={onConfirm}
+        disabled={selectedCards.length !== 10 || isPending}
+        className={`w-full py-3.5 font-bold rounded-2xl shadow-lg transition text-sm flex items-center justify-center gap-2 active:scale-95 ${
+          selectedCards.length === 10
+            ? "bg-pawn-rose hover:bg-pawn-clay shadow-rose-200 text-white"
+            : "bg-stone-300 cursor-not-allowed"
+        }`}
+      >
+        {isPending ? (
+          <>
+            <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            锁定中...
+          </>
+        ) : (
+          <>
+            <LockIcon />
+            {selectedCards.length === 10
+              ? "锁定这 10 张人生底牌"
+              : `还需选择 ${remaining} 张`}
+          </>
+        )}
+      </button>
+    </section>
+  );
 }
 
 function ActivePlay({
@@ -1279,6 +1459,24 @@ function ChevronDownIcon() {
   return (
     <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
       <polyline points="6 9 12 15 18 9" />
+    </svg>
+  );
+}
+
+function CardsIcon() {
+  return (
+    <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
+      <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+    </svg>
+  );
+}
+
+function LockIcon() {
+  return (
+    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
     </svg>
   );
 }

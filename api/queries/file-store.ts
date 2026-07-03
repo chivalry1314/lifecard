@@ -7,7 +7,7 @@
 import { readFile, writeFile, mkdir } from "fs/promises";
 import path from "path";
 import type { RoomDoc, PlayerDoc } from "./cloudbase";
-import { generateRoomId, generateToken, dealCards } from "./cloudbase";
+import { generateRoomId, generateToken } from "./cloudbase";
 
 const DATA_DIR = path.resolve(process.cwd(), "data");
 const ROOMS_FILE = path.join(DATA_DIR, "rooms.json");
@@ -119,7 +119,7 @@ export async function createPlayer(
     roomId,
     playerName,
     playerToken: generateToken(),
-    baseCards: dealCards(),
+    baseCards: [],
     pawnedCards: [],
     acceptedEvents: 0,
     lastActionAtStage: -1,
@@ -130,6 +130,22 @@ export async function createPlayer(
   };
 
   players.push(player);
+  await save();
+  return player;
+}
+
+export async function updatePlayerBaseCards(
+  roomId: string,
+  playerName: string,
+  cards: string[]
+): Promise<PlayerDoc> {
+  await ensureInit();
+  const player = await getPlayer(roomId, playerName);
+  if (!player) {
+    throw new Error("Player not found");
+  }
+  player.baseCards = cards;
+  player.updatedAt = new Date();
   await save();
   return player;
 }

@@ -38,6 +38,7 @@ export const createRoom = backend.createRoom;
 export const getRoom = backend.getRoom;
 export const updateRoomStatus = backend.updateRoomStatus;
 export const createPlayer = backend.createPlayer;
+export const updatePlayerBaseCards = backend.updatePlayerBaseCards;
 export const getPlayer = backend.getPlayer;
 export const listPlayersByRoom = backend.listPlayersByRoom;
 export const pawnCards = backend.pawnCards;

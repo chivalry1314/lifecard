@@ -255,7 +255,7 @@ export default function Home() {
               <li className="flex gap-2">
                 <span className="text-pawn-rose flex-shrink-0">🌸</span>
                 <span>
-                  <strong>初始底牌</strong>：每人拥有10张代表珍贵事物的人生底牌。
+                  <strong>初始底牌</strong>：从18张人生珍宝中，每人挑选10张作为你的初始底牌。
                 </span>
               </li>
               <li className="flex gap-2">

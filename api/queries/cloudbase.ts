@@ -146,12 +146,11 @@ export async function createPlayer(
     return existing[0] as unknown as PlayerDoc;
   }
 
-  const cards = dealCards();
   const player: Omit<PlayerDoc, "_id"> = {
     roomId,
     playerName,
     playerToken: generateToken(),
-    baseCards: cards,
+    baseCards: [],
     pawnedCards: [],
     acceptedEvents: 0,
     lastActionAtStage: -1,
@@ -163,6 +162,30 @@ export async function createPlayer(
 
   const { insertedIds } = await insertDocuments(PLAYERS_COLLECTION, [player]);
   return { _id: insertedIds[0], ...player };
+}
+
+export async function updatePlayerBaseCards(
+  roomId: string,
+  playerName: string,
+  cards: string[]
+): Promise<PlayerDoc> {
+  const player = await getPlayer(roomId, playerName);
+  if (!player) {
+    throw new Error("Player not found");
+  }
+
+  await updateDocuments(
+    PLAYERS_COLLECTION,
+    { roomId, playerName },
+    {
+      $set: {
+        baseCards: cards,
+        updatedAt: new Date(),
+      },
+    }
+  );
+
+  return { ...player, baseCards: cards };
 }
 
 export async function getPlayer(

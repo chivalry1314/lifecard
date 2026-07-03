@@ -3,6 +3,27 @@ export interface CardMeta {
   desc: string;
 }
 
+export const ALL_CARDS = [
+  "健康",
+  "颜值",
+  "才华",
+  "梦想",
+  "家人陪伴",
+  "知心挚友",
+  "安全感",
+  "自信",
+  "好奇心",
+  "自由",
+  "爱情",
+  "财富",
+  "幽默感",
+  "责任心",
+  "学习能力",
+  "热情",
+  "耐心",
+  "正义感",
+];
+
 export const CARD_DESCRIPTIONS: Record<string, string> = {
   健康: "肆意奔跑、无痛无累的强健身体",
   颜值: "被世界温柔以待的第一张通行证",
