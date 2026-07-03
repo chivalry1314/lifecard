@@ -119,7 +119,7 @@ export default function Home() {
               人生就像一场当铺游戏：你手握 10 张珍宝底牌，却在成长中遭遇重重挫折。是「接受」它，还是用 2 张底牌「典当」换取平安？
             </p>
             <div className="inline-block bg-white/70 backdrop-blur-sm px-3 py-1 rounded-full text-[11px] text-pawn-clay">
-              ✨ 治愈心理卡牌 · 4-12人线下围坐体验
+              ✨ 治愈心理卡牌 · 2-12人线下围坐体验
             </div>
           </div>
 
