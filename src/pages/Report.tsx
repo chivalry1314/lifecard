@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useParams, useNavigate } from "react-router";
 import { trpc } from "@/lib/trpc";
 import { getCardDesc } from "@/lib/cards";
+import { getRecentRooms } from "@/lib/recent-rooms";
 import { RotateCcw } from "lucide-react";
 
 type ReportTab = "mine" | "all";
@@ -91,7 +92,11 @@ export default function Report() {
   );
 
   const hostName = room.hostName;
-  const currentPlayer = players.find((p) => p.playerName === hostName) ?? players[0];
+  const myPlayerName = getRecentRooms().find((r) => r.roomId === roomId)?.playerName;
+  const currentPlayer =
+    players.find((p) => p.playerName === myPlayerName) ??
+    players.find((p) => p.playerName === hostName) ??
+    players[0];
 
   return (
     <div className="min-h-screen flex flex-col overflow-x-hidden bg-pawn-cream">
