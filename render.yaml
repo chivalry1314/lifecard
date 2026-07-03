@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: lifecard-api
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build:function
+    startCommand: node cloudfunctions/api/index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: ALLOWED_ORIGINS
+        value: https://chivalry1314.github.io
+      - key: CLOUDBASE_ENV_ID
+        sync: false
+      - key: CLOUDBASE_API_KEY
+        sync: false
