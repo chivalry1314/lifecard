@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 import { trpc } from "@/lib/trpc";
 import { useNotification } from "@/providers/notification-context";
 import {
@@ -12,9 +12,12 @@ import {
 
 export default function Home() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { success, error } = useNotification();
   const [nickname, setNickname] = useState("");
-  const [roomCode, setRoomCode] = useState("");
+  const [roomCode, setRoomCode] = useState(
+    searchParams.get("room")?.toUpperCase() || ""
+  );
   const [recentRooms, setRecentRooms] = useState<RecentRoom[]>(() =>
     getRecentRooms()
   );
@@ -145,7 +148,11 @@ export default function Home() {
                     <LoginIcon />
                   </span>
                   <h3 className="text-sm font-bold text-pawn-dark">加入已有房间</h3>
-                  <p className="text-[10px] text-stone-500">输入朋友发你的6位号码</p>
+                  <p className="text-[10px] text-stone-500">
+                  {searchParams.get("room")
+                    ? "房间号已自动填好，输入昵称即可加入"
+                    : "输入朋友发你的6位号码"}
+                </p>
                 </div>
                 <input
                   type="text"

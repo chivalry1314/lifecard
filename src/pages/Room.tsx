@@ -630,6 +630,26 @@ function WaitingRoom({
 }: WaitingRoomProps) {
   const allReady = players.length >= 2 && players.every((p) => p.baseCards.length === 10);
   const canStart = allReady && !isStarting;
+  const [copiedLink, setCopiedLink] = useState(false);
+
+  const copyInviteLink = async () => {
+    const link = `${window.location.origin}${window.location.pathname}#/?room=${roomId}`;
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2000);
+    } catch {
+      // Fallback for older browsers
+      const dummy = document.createElement("input");
+      document.body.appendChild(dummy);
+      dummy.value = link;
+      dummy.select();
+      document.execCommand("copy");
+      document.body.removeChild(dummy);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2000);
+    }
+  };
 
   return (
     <section className="w-full space-y-5 animate-fade-in">
@@ -667,6 +687,14 @@ function WaitingRoom({
             满2人可开局
           </span>
         </div>
+
+        <button
+          onClick={copyInviteLink}
+          className="w-full py-2.5 bg-white border border-rose-100 hover:border-pawn-rose text-pawn-clay hover:text-pawn-rose text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 active:scale-95"
+        >
+          <LinkIcon />
+          {copiedLink ? "邀请链接已复制 ✅" : "复制邀请链接"}
+        </button>
       </div>
 
       <div className="bg-white rounded-3xl p-5 shadow-soft-warm border border-rose-50/50 space-y-3.5">
@@ -1485,6 +1513,15 @@ function LockIcon() {
     <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
       <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+    </svg>
+  );
+}
+
+function LinkIcon() {
+  return (
+    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
     </svg>
   );
 }
