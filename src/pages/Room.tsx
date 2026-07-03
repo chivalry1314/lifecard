@@ -394,7 +394,8 @@ export default function Room() {
     });
   }, [selectedCards, playerToken, roomId, playerName, pawnMutation]);
 
-  const isLoading = roomQuery.isLoading || !hasJoined;
+  const isLoading =
+    roomQuery.isLoading || playersQuery.isLoading || !hasJoined;
 
   if (isLoading) {
     return (
@@ -492,28 +493,35 @@ export default function Room() {
           room.status === "playing" ? "pb-[200px] sm:pb-[220px]" : "pb-10"
         }`}
       >
-        {room.status === "waiting" && player && player.baseCards.length === 0 && (
-          <InitialCardSelector
-            selectedCards={initialSelectedCards}
-            onToggle={toggleInitialCard}
-            onConfirm={confirmInitialCards}
-            isPending={selectCardsMutation.isPending}
-          />
-        )}
-
-        {room.status === "waiting" && (!player || player.baseCards.length > 0) && (
-          <WaitingRoom
-            roomId={roomId!}
-            hostName={room.hostName}
-            players={players}
-            playerName={playerName}
-            isHost={isHost}
-            onStart={handleStartGame}
-            onRefresh={refreshAll}
-            syncSpin={syncSpin}
-            playerCount={players.length}
-            isStarting={startMutation.isPending}
-          />
+        {room.status === "waiting" && (
+          (() => {
+            const myPlayer =
+              player ?? players.find((p) => p.playerName === playerName);
+            if (myPlayer && myPlayer.baseCards.length === 0) {
+              return (
+                <InitialCardSelector
+                  selectedCards={initialSelectedCards}
+                  onToggle={toggleInitialCard}
+                  onConfirm={confirmInitialCards}
+                  isPending={selectCardsMutation.isPending}
+                />
+              );
+            }
+            return (
+              <WaitingRoom
+                roomId={roomId!}
+                hostName={room.hostName}
+                players={players}
+                playerName={playerName}
+                isHost={isHost}
+                onStart={handleStartGame}
+                onRefresh={refreshAll}
+                syncSpin={syncSpin}
+                playerCount={players.length}
+                isStarting={startMutation.isPending}
+              />
+            );
+          })()
         )}
 
         {room.status === "playing" && (
