@@ -226,11 +226,18 @@ export default function Room() {
         },
       });
 
-      // stageInfo may be disabled until room.status === "playing"; force it.
-      try {
-        await utils.game.stageInfo.fetch({ roomId });
-      } catch {
-        // Not playing yet or stage unavailable, ignore
+      // stageInfo may be disabled until room.status === "playing"; only force
+      // it when the room has actually started, otherwise the backend returns
+      // "当前阶段不存在" for waiting rooms (currentStage === -1).
+      if (
+        roomQuery.data?.status === "playing" &&
+        roomQuery.data?.currentStage >= 0
+      ) {
+        try {
+          await utils.game.stageInfo.fetch({ roomId });
+        } catch {
+          // Stage unavailable, ignore
+        }
       }
 
       info("已同步最新状态");
@@ -239,7 +246,7 @@ export default function Room() {
     } finally {
       setTimeout(() => setSyncSpin(false), 500);
     }
-  }, [queryClient, utils, roomId, info, error]);
+  }, [queryClient, utils, roomId, info, error, roomQuery.data]);
 
   const room = roomQuery.data;
   const player = playerQuery.data;
