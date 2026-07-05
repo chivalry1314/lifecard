@@ -1,105 +1,103 @@
 # 自动化部署方案
 
-**当前主方案：A. CloudBase 完全免费默认域名**
+**当前主方案：EdgeOne Pages + CloudBase 数据库**
 
-push 到 `main` 时只会自动部署方案 A。方案 B 和 C 已改为手动触发（`workflow_dispatch`）。
+- 前端：EdgeOne Pages 静态托管
+- 后端：EdgeOne Pages Cloud Functions
+- 数据库：CloudBase NoSQL
+
+```
+EdgeOne Pages 默认域名
+        │
+        ├── /              → 静态页面（前端）
+        └── /api/*         → Cloud Functions（后端）
+                                │
+                                ▼
+                        CloudBase NoSQL 数据库
+```
+
+**优点：**
+- 前后端同域名，不跨域
+- 不需要 ICP 备案
+- 全球边缘节点加速
+- 小流量在免费额度内
+
+---
+
+## 方案对比
 
 | 方案 | 域名 | 是否跨域 | 是否需要备案 | 成本 | 当前状态 |
 |------|------|---------|-------------|------|---------|
-| **A. 完全免费默认域名** | CloudBase 默认域名 | 跨域 | 不需要 | ¥0 | **自动部署** |
-| **B. 一体化自定义域名** | 已备案自定义域名 | 不跨域 | 需要 | ¥0~几块钱/月 | 手动触发 |
-| **C. GitHub Pages 备选** | GitHub Pages + CloudBase | 跨域 | 不需要 | ¥0 | 手动触发 |
+| **EdgeOne Pages** | EdgeOne 默认域名 | 否 | 不需要 | ¥0 | **当前主方案** |
+| GitHub Pages 备选 | GitHub Pages + CloudBase | 跨域 | 不需要 | ¥0 | 手动触发 |
+| CloudBase 一体化 | 已备案自定义域名 | 否 | 需要 | ¥0~几块钱/月 | 已移除 workflow |
 
 ---
 
-## 方案 A：完全免费默认域名（推荐入门）
+## EdgeOne Pages 部署
 
+### 1. 前置准备
+
+1. **CloudBase 环境**
+   - 进入 [CloudBase 控制台](https://console.cloud.tencent.com/tcb)
+   - 免费开通环境，记录 **环境 ID**
+   - 创建服务端 API Key
+   - 创建数据库集合 `rooms` 和 `players`
+
+2. **EdgeOne Pages 项目**
+   - 进入 [EdgeOne Pages 控制台](https://console.cloud.tencent.com/edgeone/pages)
+   - 创建项目 → 导入 Git 仓库
+   - 选择本仓库和 `main` 分支
+
+### 2. 构建配置
+
+EdgeOne Pages 会自动读取项目根目录的 `edgeone.json`：
+
+```json
+{
+  "buildCommand": "npm run build:edgeone",
+  "outputDirectory": "./dist/public",
+  "installCommand": "npm install",
+  "nodeVersion": "22.11.0",
+  "rewrites": [
+    { "source": "/*", "destination": "/index.html" }
+  ]
+}
 ```
-CloudBase 静态托管默认域名
-        │  API 请求（跨域，后端 CORS 已处理）
-        ▼
-CloudBase HTTP 云函数默认域名
-        │
-        ▼
-CloudBase NoSQL 数据库
-```
 
-**工作流：** `.github/workflows/deploy-cloudbase-free.yml`
+构建命令说明：
+- `vite build`：构建前端静态资源到 `dist/public`
+- `node scripts/build-edgeone.mjs`：将 `edgeone/api.ts` 打包为 `cloud-functions/api/[[default]].js`
 
-### 配置 Secrets
+### 3. 环境变量
 
-| Secret | 说明 |
+在 EdgeOne Pages 控制台 → **环境变量与密钥**，添加：
+
+| 变量名 | 说明 |
 |--------|------|
-| `TENCENT_CLOUD_SECRET_ID` / `TENCENT_CLOUD_SECRET_KEY` | 腾讯云 API 密钥 |
-| `TCB_ENV_ID` | CloudBase 环境 ID |
+| `CLOUDBASE_ENV_ID` | CloudBase 环境 ID |
 | `CLOUDBASE_API_KEY` | CloudBase 服务端 API Key |
-| `ALLOWED_ORIGINS` | 首次可填 `*`，获取静态托管默认域名后更新为真实域名 |
+| `ALLOWED_ORIGINS` | EdgeOne Pages 默认域名，可先填 `*`，部署后改为真实域名 |
 
-### 部署流程
+> Cloud Functions 中通过 `process.env.XXX` 读取环境变量。
 
-push 到 `main` 后，工作流自动完成：
+### 4. 路由说明
 
-1. `npm run build:function` 构建云函数
-2. `tcb fn deploy api ...` 部署 HTTP 云函数
-3. 通过 `tcb fn list` 获取云函数默认访问 URL
-4. `npm run build` 构建前端，注入 `VITE_API_URL`
-5. `tcb hosting deploy ...` 部署前端到 CloudBase 静态托管
+EdgeOne Pages 自动识别 `cloud-functions/` 目录：
 
-### 首次部署后
+- `cloud-functions/api/[[default]].js` → 路由 `/api/*`
+- 前端静态资源 → 路由 `/`
+- `rewrites` 配置确保 BrowserRouter 刷新不 404
 
-1. 进入 CloudBase 控制台 → **静态网站托管**
-2. 复制默认域名，例如 `https://your-env-id-xxx.tcloudbaseapp.com`
-3. 更新 GitHub Secrets 中的 `ALLOWED_ORIGINS` 为该域名
-4. 重新触发 workflow
+### 5. 部署
 
-> 前端使用 HashRouter（`VITE_ROUTER_TYPE=hash`），静态资源使用相对路径（`VITE_BASE_URL=./`），兼容默认域名任意子路径。
+push 到 `main` 后，EdgeOne Pages 会自动重新构建并部署。
 
 ---
 
-## 方案 B：一体化自定义域名
+## 备选：GitHub Pages + CloudBase 云函数
 
-```
-自定义域名（需 ICP 备案）
-        │
-        ├── /              → CloudBase 静态网站托管
-        └── /api/*         → CloudBase HTTP 云函数
-```
-
-### 配置 Secrets
-
-| Secret | 说明 |
-|--------|------|
-| `TENCENT_CLOUD_SECRET_ID` / `TENCENT_CLOUD_SECRET_KEY` | 腾讯云 API 密钥 |
-| `TCB_ENV_ID` | CloudBase 环境 ID |
-| `CLOUDBASE_API_KEY` | CloudBase 服务端 API Key |
-| `ALLOWED_ORIGINS` | 你的自定义域名 |
-
-### 工作流
-
-- **后端：** `.github/workflows/deploy-cloudbase-function.yml`
-- **前端：** `.github/workflows/deploy-cloudbase-hosting.yml`
-
-### 控制台配置
-
-1. CloudBase 环境升级到按量付费版
-2. **静态网站托管** → **自定义域名**，绑定备案域名
-3. 配置路径规则：
-   - `/api/*` → 云函数 `api`
-   - `/*` → `/index.html`（SPA 回退）
-
-### 与方案 A 的差异
-
-| 配置 | 方案 A（免费） | 方案 B（自定义域名） |
-|------|--------------|-------------------|
-| `ALLOWED_ORIGINS` | 静态托管默认域名 | 自定义域名 |
-| `VITE_API_URL` | 自动获取 | 不配置 |
-| `VITE_BASE_URL` | `./` | 不配置 |
-| `VITE_ROUTER_TYPE` | `hash` | 不配置（BrowserRouter） |
-| 跨域 | 是 | 否 |
-
----
-
-## 方案 C：GitHub Pages 备选
+> 此方案保留为手动触发的备选。当前 CloudBase 免费版 HTTP 函数直接 URL 访问存在问题，建议优先使用 EdgeOne Pages。如 EdgeOne 方案跑不通，可切回此方案。
 
 | Secret | 值 |
 |--------|-----|
@@ -108,19 +106,7 @@ push 到 `main` 后，工作流自动完成：
 | `VITE_BASE_URL` | `./` |
 | `VITE_ROUTER_TYPE` | `hash` |
 
-### 工作流
-
-- **后端：** `.github/workflows/deploy-cloudbase-function.yml`
-- **前端：** `.github/workflows/deploy-gh-pages.yml`
-
----
-
-## CORS 说明
-
-- **方案 A/C**：前后端不同域名，浏览器会触发 CORS。后端会根据 `ALLOWED_ORIGINS` 自动放行对应域名，并同步调整 CSP 的 `connect-src`。
-- **方案 B**：前后端同域名，不会触发 CORS。`ALLOWED_ORIGINS` 仍建议配置为自定义域名作为安全层。
-
-测试阶段 `ALLOWED_ORIGINS=*` 可用，生产环境建议配置为具体域名。
+手动触发 `.github/workflows/deploy-cloudbase-function.yml` 和 `deploy-gh-pages.yml`。
 
 ---
 
@@ -130,7 +116,7 @@ push 到 `main` 后，工作流自动完成：
 npm run dev
 ```
 
-本地开发无需配置 `VITE_API_URL`，前端通过 Vite 代理到后端。
+本地开发时前端走 `/api/trpc`，Vite 会代理到后端，无需配置环境变量。
 
 ## 本地验证
 
@@ -140,7 +126,7 @@ npm run dev
 npm run check
 npm run lint
 npm run build
-npm run build:function
+npm run build:edgeone
 ```
 
-CI 会在 PR 阶段执行这些检查。
+`build:edgeone` 会同时构建前端和 EdgeOne Cloud Function。

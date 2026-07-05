@@ -1,0 +1,12 @@
+{
+  "buildCommand": "npm run build:edgeone",
+  "outputDirectory": "./dist/public",
+  "installCommand": "npm install",
+  "nodeVersion": "22.11.0",
+  "rewrites": [
+    {
+      "source": "/*",
+      "destination": "/index.html"
+    }
+  ]
+}

@@ -38,7 +38,8 @@ data/
 # Build outputs
 dist/
 build/
-cloudfunctions/api/index.js
+cloudfunctions/
+cloud-functions/
 # Test coverage
 coverage/
 .nyc_output/

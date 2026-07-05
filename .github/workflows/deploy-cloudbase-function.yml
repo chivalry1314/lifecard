@@ -1,8 +1,6 @@
-# 一体化部署：此工作流只部署后端云函数，前端静态托管由 deploy-cloudbase-hosting.yml 处理。
+# 当前主方案是 EdgeOne Pages，此工作流作为 GitHub Pages 备选方案的后端部署，改为手动触发。
 name: Deploy API to CloudBase Function
 
-# 当前主方案是 CloudBase 免费静态托管，此工作流暂时改为手动触发。
-# 如后续切换到自定义域名一体化方案，可恢复 push 触发。
 on:
   workflow_dispatch:
 
@@ -29,7 +27,7 @@ jobs:
         run: npm run lint
 
       - name: Build function bundle
-        run: npm run build:function
+        run: npm run build:cloudbase
 
       - name: Make scf_bootstrap executable
         run: chmod +x cloudfunctions/api/scf_bootstrap
