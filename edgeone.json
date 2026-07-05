@@ -5,6 +5,14 @@
   "nodeVersion": "22.11.0",
   "rewrites": [
     {
+      "source": "/api/*",
+      "destination": "/api/:splat"
+    },
+    {
+      "source": "/assets/*",
+      "destination": "/assets/:splat"
+    },
+    {
       "source": "/*",
       "destination": "/index.html"
     }
