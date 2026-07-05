@@ -14,6 +14,7 @@ import {
   addRecentRoom,
 } from "@/lib/recent-rooms";
 import { getCardDesc, ALL_CARDS } from "@/lib/cards";
+import CardDrawer from "@/components/CardDrawer";
 import type { RoomPlayer } from "@/components/room/types";
 
 interface ConfirmModalState {
@@ -34,9 +35,11 @@ export default function Room() {
   const utils = trpc.useUtils();
   const queryClient = useQueryClient();
 
-  const [playerName] = useState(urlName);
+  const [playerName, setPlayerName] = useState(urlName.trim());
   const [hasJoined, setHasJoined] = useState(false);
   const joinAttemptedRef = useRef(false);
+  const [loadTimedOut, setLoadTimedOut] = useState(false);
+  const loadingStartRef = useRef<number | null>(null);
   const [playerToken, setPlayerToken] = useState(() => {
     const recent = getRecentRooms().find(
       (r) => r.roomId === roomId && r.playerName === playerName
@@ -45,6 +48,7 @@ export default function Room() {
   });
   const [selectedCards, setSelectedCards] = useState<string[]>([]);
   const [initialSelectedCards, setInitialSelectedCards] = useState<string[]>([]);
+  const [pendingName, setPendingName] = useState(urlName.trim());
   const [pawnMode, setPawnMode] = useState(false);
   const [modal, setModal] = useState<ConfirmModalState>({
     open: false,
@@ -397,12 +401,105 @@ export default function Room() {
   const isLoading =
     roomQuery.isLoading || playersQuery.isLoading || !hasJoined;
 
-  if (isLoading) {
+  // Track loading start time to detect hangs
+  useEffect(() => {
+    if (isLoading && loadingStartRef.current === null) {
+      loadingStartRef.current = Date.now();
+      const timer = setTimeout(() => setLoadTimedOut(true), 8000);
+      return () => clearTimeout(timer);
+    }
+    if (!isLoading) {
+      loadingStartRef.current = null;
+      setLoadTimedOut(false);
+    }
+  }, [isLoading]);
+
+  const handleSetName = useCallback(() => {
+    const name = pendingName.trim();
+    if (!name) return;
+    if (name.length > 20 || /[<>]/.test(name)) {
+      error("昵称格式不正确");
+      return;
+    }
+    setPlayerName(name);
+    joinAttemptedRef.current = false;
+    joinMutation.reset();
+  }, [pendingName, error, joinMutation]);
+
+  if (isLoading || loadTimedOut) {
+    // Name missing: let user enter it before joining
+    if (!playerName) {
+      return (
+        <div className="min-h-screen bg-pawn-cream flex items-center justify-center p-6">
+          <div className="bg-white rounded-3xl p-6 shadow-soft-warm max-w-sm w-full text-center space-y-4 animate-fade-in">
+            <div className="w-12 h-12 bg-pawn-cream rounded-full flex items-center justify-center mx-auto text-pawn-rose">
+              <UserIcon />
+            </div>
+            <div className="space-y-1">
+              <h2 className="serif-title text-lg font-bold text-pawn-dark">进入房间</h2>
+              <p className="text-xs text-stone-500">房间号：{roomId}</p>
+            </div>
+            <input
+              type="text"
+              value={pendingName}
+              onChange={(e) => setPendingName(e.target.value)}
+              placeholder="给自己起个温柔的昵称"
+              maxLength={20}
+              onKeyDown={(e) => e.key === "Enter" && handleSetName()}
+              className="w-full px-4 py-3 bg-pawn-cream/60 rounded-2xl border-2 border-transparent focus-visible:ring-2 focus-visible:ring-pawn-rose/30 focus:border-pawn-rose focus:bg-white outline-none transition text-base placeholder:text-stone-400 text-center"
+            />
+            <button
+              onClick={handleSetName}
+              disabled={!pendingName.trim()}
+              className="w-full py-3 bg-pawn-rose hover:bg-pawn-clay disabled:bg-stone-300 text-white text-sm font-bold rounded-xl transition active:scale-95"
+            >
+              加入房间
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // Timed out or still loading
     return (
-      <div className="min-h-screen bg-pawn-cream flex items-center justify-center">
-        <div className="text-center space-y-3">
-          <div className="w-8 h-8 border-2 border-pawn-rose border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-pawn-dark/70 text-sm">正在加入房间...</p>
+      <div className="min-h-screen bg-pawn-cream flex items-center justify-center p-6">
+        <div className="bg-white rounded-3xl p-6 shadow-soft-warm max-w-sm w-full text-center space-y-4">
+          {loadTimedOut ? (
+            <>
+              <div className="w-12 h-12 bg-amber-50 rounded-full flex items-center justify-center mx-auto text-pawn-gold">
+                <ClockIcon />
+              </div>
+              <h2 className="serif-title text-lg font-bold text-pawn-dark">连接有点慢</h2>
+              <p className="text-xs text-stone-500">加入房间耗时较长，可能是网络或服务器原因。</p>
+            </>
+          ) : (
+            <>
+              <div className="w-8 h-8 border-2 border-pawn-rose border-t-transparent rounded-full animate-spin mx-auto" />
+              <p className="text-pawn-dark/70 text-sm">正在加入房间...</p>
+            </>
+          )}
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                joinAttemptedRef.current = false;
+                joinMutation.reset();
+                setLoadTimedOut(false);
+                loadingStartRef.current = null;
+                if (roomId && playerName) {
+                  joinMutation.mutate({ roomId, playerName });
+                }
+              }}
+              className="flex-1 py-2.5 bg-pawn-rose hover:bg-pawn-clay text-white text-xs font-bold rounded-xl transition"
+            >
+              重试
+            </button>
+            <button
+              onClick={() => navigate("/")}
+              className="flex-1 py-2.5 bg-white border border-stone-200 text-stone-600 text-xs font-bold rounded-xl hover:bg-stone-50 transition"
+            >
+              返回首页
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -633,7 +730,12 @@ function WaitingRoom({
   const [copiedLink, setCopiedLink] = useState(false);
 
   const copyInviteLink = async () => {
-    const link = `${window.location.origin}${window.location.pathname}#/?room=${roomId}`;
+    const isHashRouter = import.meta.env.VITE_ROUTER_TYPE === "hash";
+    const basePath = window.location.pathname;
+    const query = `?room=${roomId}`;
+    const link = isHashRouter
+      ? `${window.location.origin}${basePath}#/${query}`
+      : `${window.location.origin}${basePath}${query}`;
     try {
       await navigator.clipboard.writeText(link);
       setCopiedLink(true);
@@ -1221,123 +1323,6 @@ function ActivePlay({
   );
 }
 
-interface CardDrawerProps {
-  cards: string[];
-  pawnedCards: string[];
-  selectedCards: string[];
-  pawnMode: boolean;
-  onToggleCard: (card: string) => void;
-}
-
-function CardDrawer({
-  cards,
-  pawnedCards,
-  selectedCards,
-  pawnMode,
-  onToggleCard,
-}: CardDrawerProps) {
-  const keptCount = cards.length - pawnedCards.length;
-  const scrollRef = useRef<HTMLDivElement>(null);
-
-  const scroll = (dir: "left" | "right") => {
-    if (!scrollRef.current) return;
-    const amount = dir === "left" ? -160 : 160;
-    scrollRef.current.scrollBy({ left: amount, behavior: "smooth" });
-  };
-
-  return (
-    <footer className="fixed bottom-0 left-0 right-0 max-w-xl mx-auto bg-pawn-cream/95 backdrop-blur-md border-t border-rose-100/80 p-3 sm:p-4 rounded-t-3xl shadow-floating-deck z-20 space-y-2">
-      <div className="flex items-center justify-between text-[11px] font-bold text-pawn-dark px-1">
-        <span className="flex items-center gap-1">🌿 属于我的人生底牌</span>
-        <span className="text-stone-400">保留: {keptCount} / {cards.length}</span>
-      </div>
-
-      <div className="relative group">
-        {/* Left fade / arrow */}
-        <button
-          onClick={() => scroll("left")}
-          className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-7 h-7 bg-white/90 backdrop-blur rounded-full shadow-md border border-rose-100 flex items-center justify-center text-pawn-rose opacity-80 hover:opacity-100 active:scale-95 transition hidden sm:flex"
-          aria-label="向左滑动"
-        >
-          <ChevronLeftIcon />
-        </button>
-
-        {/* Right fade / arrow */}
-        <button
-          onClick={() => scroll("right")}
-          className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-7 h-7 bg-white/90 backdrop-blur rounded-full shadow-md border border-rose-100 flex items-center justify-center text-pawn-rose opacity-80 hover:opacity-100 active:scale-95 transition hidden sm:flex"
-          aria-label="向右滑动"
-        >
-          <ChevronRightIcon />
-        </button>
-
-        {/* Scrollable deck */}
-        <div
-          ref={scrollRef}
-          className="flex space-x-2.5 sm:space-x-3 overflow-x-auto pb-safe pt-0.5 px-1 card-scroller snap-x snap-mandatory"
-        >
-          {cards.map((card) => {
-            const isPawned = pawnedCards.includes(card);
-            const isSelected = selectedCards.includes(card);
-
-            let cls =
-              "flex-shrink-0 w-[88px] sm:w-24 md:w-28 h-28 sm:h-32 rounded-xl p-2 sm:p-2.5 flex flex-col justify-between select-none relative overflow-hidden text-left snap-center shadow-sm border-2 transition-all duration-300 ";
-            if (isPawned) {
-              cls += "bg-stone-100/90 border-stone-200 text-stone-400";
-            } else if (isSelected) {
-              cls += "bg-amber-50/90 border-pawn-gold shadow-gold-glow cursor-pointer";
-            } else if (pawnMode) {
-              cls += "bg-white border-dashed border-rose-200 hover:border-pawn-gold cursor-pointer";
-            } else {
-              cls += "bg-white border-pawn-cream hover:shadow-soft-warm hover:-translate-y-1";
-            }
-
-            return (
-              <div key={card} className={cls} onClick={() => onToggleCard(card)}>
-                {isPawned && (
-                  <div className="absolute inset-0 flex items-center justify-center rotate-12 pointer-events-none select-none">
-                    <span className="border border-rose-300 text-rose-300 font-bold tracking-widest text-[8px] sm:text-[9px] uppercase rounded px-1 py-0.5 bg-white/80">
-                      已典当
-                    </span>
-                  </div>
-                )}
-                <div className="flex items-center justify-between gap-1">
-                  <span
-                    className={`text-[10px] sm:text-[11px] font-bold truncate ${
-                      isPawned ? "text-stone-400" : "text-pawn-dark"
-                    }`}
-                  >
-                    {card}
-                  </span>
-                  {!isPawned && <SparkleIcon />}
-                </div>
-                <p
-                  className={`text-[8px] sm:text-[8.5px] leading-snug line-clamp-3 sm:line-clamp-4 ${
-                    isPawned ? "text-stone-400/80" : "text-stone-500"
-                  }`}
-                >
-                  {getCardDesc(card)}
-                </p>
-                <div
-                  className={`text-[6px] sm:text-[7px] tracking-wider text-right uppercase font-mono ${
-                    isPawned ? "text-stone-300" : "text-stone-400"
-                  }`}
-                >
-                  {isPawned ? "PAWNED" : "KEPT"}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      <p className="text-center text-[9px] text-stone-400 sm:hidden">
-        👈 左右滑动查看全部底牌 👉
-      </p>
-    </footer>
-  );
-}
-
 // ─── Helpers ───
 
 function getStageSubtitle(stage: number): string {
@@ -1393,6 +1378,15 @@ function UsersIcon() {
       <circle cx="9" cy="7" r="4" />
       <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
       <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  );
+}
+
+function UserIcon() {
+  return (
+    <svg className="w-6 h-6 text-pawn-rose" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
     </svg>
   );
 }
@@ -1471,22 +1465,6 @@ function ArrowRightIcon() {
     <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
       <line x1="5" y1="12" x2="19" y2="12" />
       <polyline points="12 5 19 12 12 19" />
-    </svg>
-  );
-}
-
-function ChevronLeftIcon() {
-  return (
-    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="15 18 9 12 15 6" />
-    </svg>
-  );
-}
-
-function ChevronRightIcon() {
-  return (
-    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="9 18 15 12 9 6" />
     </svg>
   );
 }

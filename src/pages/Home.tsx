@@ -21,6 +21,7 @@ export default function Home() {
   const [recentRooms, setRecentRooms] = useState<RecentRoom[]>(() =>
     getRecentRooms()
   );
+  const [mode, setMode] = useState<"room" | "solo">("room");
 
   const createRoom = trpc.room.create.useMutation({
     onSuccess: (data) => {
@@ -77,6 +78,12 @@ export default function Home() {
         item.playerName
       )}`
     );
+  };
+
+  const handleStartSolo = () => {
+    const name = nickname.trim();
+    if (!validateName(name)) return;
+    navigate(`/solo?name=${encodeURIComponent(name)}`);
   };
 
   const handleRemove = (roomId: string, e: React.MouseEvent) => {
@@ -140,59 +147,104 @@ export default function Home() {
               />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
-              {/* Join */}
-              <div className="bg-pawn-cream/40 border border-rose-100/50 rounded-2xl p-4 flex flex-col justify-between hover:border-pawn-rose/60 transition-all">
-                <div className="space-y-1">
-                  <span className="text-pawn-rose text-lg">
-                    <LoginIcon />
-                  </span>
-                  <h3 className="text-sm font-bold text-pawn-dark">加入已有房间</h3>
-                  <p className="text-[10px] text-stone-500">
-                  {searchParams.get("room")
-                    ? "房间号已自动填好，输入昵称即可加入"
-                    : "输入朋友发你的6位号码"}
-                </p>
-                </div>
-                <input
-                  type="text"
-                  value={roomCode}
-                  onChange={(e) =>
-                    setRoomCode(
-                      e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "")
-                    )
-                  }
-                  placeholder="输入 6 位房间号"
-                  maxLength={6}
-                  className="w-full mt-3 text-center tracking-widest text-base py-2 px-3 bg-white border border-rose-100 rounded-xl focus:border-pawn-rose outline-none"
-                />
-                <button
-                  onClick={handleJoin}
-                  className="w-full mt-2.5 py-3 bg-pawn-rose hover:bg-pawn-clay text-white text-xs font-bold rounded-xl transition shadow-md shadow-rose-100 active:scale-[0.97]"
-                >
-                  加入游戏
-                </button>
-              </div>
+            {/* Mode Tabs */}
+            <div className="bg-stone-50 rounded-full p-1 flex space-x-1">
+              <button
+                onClick={() => setMode("room")}
+                className={`flex-1 py-2 text-xs font-bold rounded-full transition active:scale-95 ${
+                  mode === "room"
+                    ? "bg-pawn-rose text-white shadow-sm"
+                    : "text-stone-500 hover:bg-stone-100"
+                }`}
+              >
+                🏠 房间聚会
+              </button>
+              <button
+                onClick={() => setMode("solo")}
+                className={`flex-1 py-2 text-xs font-bold rounded-full transition active:scale-95 ${
+                  mode === "solo"
+                    ? "bg-pawn-gold text-white shadow-sm"
+                    : "text-stone-500 hover:bg-stone-100"
+                }`}
+              >
+                🧘 个人剖析
+              </button>
+            </div>
 
-              {/* Create */}
-              <div className="bg-gradient-to-b from-[#FDF8F5] to-amber-50/50 border border-amber-100 rounded-2xl p-4 flex flex-col justify-between hover:border-pawn-gold/60 transition-all">
+            {mode === "room" ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
+                {/* Join */}
+                <div className="bg-pawn-cream/40 border border-rose-100/50 rounded-2xl p-4 flex flex-col justify-between hover:border-pawn-rose/60 transition-all">
+                  <div className="space-y-1">
+                    <span className="text-pawn-rose text-lg">
+                      <LoginIcon />
+                    </span>
+                    <h3 className="text-sm font-bold text-pawn-dark">加入已有房间</h3>
+                    <p className="text-[10px] text-stone-500">
+                    {searchParams.get("room")
+                      ? "房间号已自动填好，输入昵称即可加入"
+                      : "输入朋友发你的6位号码"}
+                  </p>
+                  </div>
+                  <input
+                    type="text"
+                    value={roomCode}
+                    onChange={(e) =>
+                      setRoomCode(
+                        e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "")
+                      )
+                    }
+                    placeholder="输入 6 位房间号"
+                    maxLength={6}
+                    className="w-full mt-3 text-center tracking-widest text-base py-2 px-3 bg-white border border-rose-100 rounded-xl focus:border-pawn-rose outline-none"
+                  />
+                  <button
+                    onClick={handleJoin}
+                    className="w-full mt-2.5 py-3 bg-pawn-rose hover:bg-pawn-clay text-white text-xs font-bold rounded-xl transition shadow-md shadow-rose-100 active:scale-[0.97]"
+                  >
+                    加入游戏
+                  </button>
+                </div>
+
+                {/* Create */}
+                <div className="bg-gradient-to-b from-[#FDF8F5] to-amber-50/50 border border-amber-100 rounded-2xl p-4 flex flex-col justify-between hover:border-pawn-gold/60 transition-all">
+                  <div className="space-y-1">
+                    <span className="text-pawn-gold text-lg">
+                      <LockIcon />
+                    </span>
+                    <h3 className="text-sm font-bold text-pawn-dark">创建新房间</h3>
+                    <p className="text-[10px] text-stone-500">作为主持人开启一局新游戏</p>
+                  </div>
+                  <div className="mt-6 sm:mt-12"></div>
+                  <button
+                    onClick={handleCreate}
+                    disabled={createRoom.isPending}
+                    className="w-full py-3 bg-pawn-gold hover:bg-[#C99A66] disabled:bg-stone-300 text-white text-xs font-bold rounded-xl transition shadow-md shadow-amber-100 active:scale-[0.97]"
+                  >
+                    {createRoom.isPending ? "创建中..." : "创建并进入"}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-gradient-to-b from-amber-50 to-white border border-amber-100 rounded-2xl p-4 flex flex-col justify-between hover:border-pawn-gold transition-all">
                 <div className="space-y-1">
                   <span className="text-pawn-gold text-lg">
-                    <LockIcon />
+                    <MirrorIcon />
                   </span>
-                  <h3 className="text-sm font-bold text-pawn-dark">创建新房间</h3>
-                  <p className="text-[10px] text-stone-500">作为主持人开启一局新游戏</p>
+                  <h3 className="text-sm font-bold text-pawn-dark">个人剖析模式</h3>
+                  <p className="text-[10px] text-stone-500">
+                    独自一人完成人生当铺，获得专属价值观画像与心灵批注
+                  </p>
                 </div>
-                <div className="mt-6 sm:mt-12"></div>
+                <div className="mt-6 sm:mt-8"></div>
                 <button
-                  onClick={handleCreate}
-                  disabled={createRoom.isPending}
-                  className="w-full py-3 bg-pawn-gold hover:bg-[#C99A66] disabled:bg-stone-300 text-white text-xs font-bold rounded-xl transition shadow-md shadow-amber-100 active:scale-[0.97]"
+                  onClick={handleStartSolo}
+                  className="w-full py-3 bg-pawn-gold hover:bg-[#C99A66] text-white text-xs font-bold rounded-xl transition shadow-md shadow-amber-100 active:scale-[0.97]"
                 >
-                  {createRoom.isPending ? "创建中..." : "创建并进入"}
+                  开始个人剖析
                 </button>
               </div>
-            </div>
+            )}
           </div>
 
           {/* History */}
@@ -351,6 +403,15 @@ function TagIcon() {
     <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
       <line x1="7" y1="7" x2="7.01" y2="7" />
+    </svg>
+  );
+}
+
+function MirrorIcon() {
+  return (
+    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z" />
+      <path d="M12 18a6 6 0 0 0 0-12 6 6 0 0 0 0 12z" />
     </svg>
   );
 }
