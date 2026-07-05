@@ -168,7 +168,23 @@ export default function Report() {
   );
 }
 
-function MyReport({ player }: { player: { playerName: string; baseCards: string[]; pawnedCards: string[]; acceptedEvents?: number; choices?: { stageIndex: number; type: "accept" | "pawn"; cards: string[] }[] } }) {
+function MyReport({
+  player,
+}: {
+  player: {
+    playerName: string;
+    baseCards: string[];
+    pawnedCards: string[];
+    acceptedEvents?: number;
+    stageEvents?: Record<number, string>;
+    choices?: {
+      stageIndex: number;
+      type: "accept" | "pawn";
+      cards: string[];
+      event?: string;
+    }[];
+  };
+}) {
   const keptCount = player.baseCards.length;
   const pawnedCount = player.pawnedCards.length;
   const total = keptCount + pawnedCount || 10;
@@ -209,13 +225,26 @@ function MyReport({ player }: { player: { playerName: string; baseCards: string[
               .map((choice) => (
                 <div
                   key={choice.stageIndex}
-                  className="flex items-start justify-between p-2.5 rounded-xl bg-stone-50 border border-stone-100 text-xs"
+                  className="p-2.5 rounded-xl bg-stone-50 border border-stone-100 text-xs space-y-1.5"
                 >
-                  <div>
-                    <span className="font-bold text-pawn-dark block mb-0.5">
+                  <div className="flex items-start justify-between">
+                    <span className="font-bold text-pawn-dark">
                       第 {choice.stageIndex + 1} 阶段
                     </span>
-                    {choice.type === "accept" ? (
+                    <span
+                      className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                        choice.type === "accept"
+                          ? "bg-emerald-50 text-emerald-500"
+                          : "bg-amber-50 text-pawn-gold"
+                      }`}
+                    >
+                      {choice.type === "accept" ? "接受" : "典当"}
+                    </span>
+                  </div>
+                  <div className="text-[10px] text-pawn-clay bg-rose-50 inline-block px-2 py-0.5 rounded-md border border-rose-100">
+                    挫折：{choice.event || player.stageEvents?.[choice.stageIndex] || "未知"}
+                  </div>
+                  {choice.type === "accept" ? (
                       <span className="text-pawn-sage">直面并接受挫折</span>
                     ) : (
                       <div className="space-y-1">
@@ -232,16 +261,6 @@ function MyReport({ player }: { player: { playerName: string; baseCards: string[
                         </div>
                       </div>
                     )}
-                  </div>
-                  <span
-                    className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
-                      choice.type === "accept"
-                        ? "bg-emerald-50 text-emerald-500"
-                        : "bg-amber-50 text-pawn-gold"
-                    }`}
-                  >
-                    {choice.type === "accept" ? "接受" : "典当"}
-                  </span>
                 </div>
               ))
           ) : (
@@ -312,7 +331,19 @@ function AllReport({
   players,
   hostName,
 }: {
-  players: { playerName: string; baseCards: string[]; pawnedCards: string[]; acceptedEvents?: number }[];
+  players: {
+    playerName: string;
+    baseCards: string[];
+    pawnedCards: string[];
+    acceptedEvents?: number;
+    stageEvents?: Record<number, string>;
+    choices?: {
+      stageIndex: number;
+      type: "accept" | "pawn";
+      cards: string[];
+      event?: string;
+    }[];
+  }[];
   hostName: string;
 }) {
   return (
@@ -328,13 +359,16 @@ function AllReport({
             const total = keptCount + p.pawnedCards.length || 10;
             const retention = Math.round((keptCount / total) * 100);
             const pawnNames = p.pawnedCards.join("、") || "无";
+            const stageEntries = [...(p.choices || [])].sort(
+              (a, b) => a.stageIndex - b.stageIndex
+            );
 
             return (
               <div
                 key={p.playerName}
                 className={`p-4 rounded-2xl border transition duration-300 ${
                   isHost ? "bg-[#FFFDFB] border-rose-200" : "bg-stone-50/70 border-stone-200/50"
-                } space-y-2`}
+                } space-y-2.5`}
               >
                 <div className="flex items-center justify-between text-xs font-bold text-pawn-dark border-b border-rose-50/50 pb-2">
                   <span className="flex items-center gap-1.5">
@@ -353,6 +387,54 @@ function AllReport({
                     <span className="text-pawn-gold font-medium">{pawnNames}</span>
                   </div>
                 </div>
+
+                {stageEntries.length > 0 && (
+                  <div className="pt-2 border-t border-rose-50/50 space-y-1.5">
+                    <span className="text-[10px] font-bold text-pawn-dark block">
+                      各阶段抽卡与抉择
+                    </span>
+                    <div className="space-y-1">
+                      {stageEntries.map((choice) => {
+                        const event =
+                          choice.event || p.stageEvents?.[choice.stageIndex] || "未知";
+                        return (
+                          <div
+                            key={choice.stageIndex}
+                            className="text-[10px] leading-relaxed bg-white/60 rounded-lg p-1.5 border border-rose-100/30"
+                          >
+                            <div className="flex items-center justify-between mb-0.5">
+                              <span className="font-bold text-pawn-dark">
+                                第 {choice.stageIndex + 1} 阶段
+                              </span>
+                              <span
+                                className={`px-1.5 py-0.5 rounded-full font-bold text-[9px] ${
+                                  choice.type === "accept"
+                                    ? "bg-emerald-50 text-emerald-500"
+                                    : "bg-amber-50 text-pawn-gold"
+                                }`}
+                              >
+                                {choice.type === "accept" ? "接受" : "典当"}
+                              </span>
+                            </div>
+                            <div className="text-pawn-clay/90 mb-0.5">💔 {event}</div>
+                            {choice.type === "pawn" && choice.cards.length > 0 && (
+                              <div className="flex flex-wrap gap-1">
+                                {choice.cards.map((card) => (
+                                  <span
+                                    key={card}
+                                    className="px-1 py-0.5 bg-amber-50 text-amber-600 rounded border border-amber-100 line-through"
+                                  >
+                                    {card}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })}

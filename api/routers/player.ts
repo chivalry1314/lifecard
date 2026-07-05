@@ -6,6 +6,7 @@ import {
   getRoom,
   getPlayer,
   listPlayersByRoom,
+  revealPlayerEvent,
   pawnCards,
   acceptAdversity,
   ALL_CARDS,
@@ -120,6 +121,40 @@ export const playerRouter = createRouter({
         throwAppError(Errors.notFound("房间不存在"));
       }
       return listPlayersByRoom(input.roomId);
+    }),
+
+  // Reveal a personal adversity event for the current stage
+  revealEvent: publicProcedure
+    .input(
+      z.object({
+        roomId: roomIdSchema,
+        playerName: nameSchema,
+        playerToken: z.string().min(1, "玩家令牌不能为空"),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const room = await getRoom(input.roomId);
+      if (!room) {
+        throwAppError(Errors.notFound("房间不存在"));
+      }
+      if (room.status !== "playing" || room.currentStage < 0) {
+        throwAppError(Errors.badRequest("游戏尚未开始或已结束"));
+      }
+
+      const player = await getPlayer(input.roomId, input.playerName);
+      if (!player) {
+        throwAppError(Errors.notFound("玩家不存在"));
+      }
+      if (player.playerToken !== input.playerToken) {
+        throwAppError(Errors.forbidden("玩家身份验证失败"));
+      }
+
+      const event = await revealPlayerEvent(
+        input.roomId,
+        input.playerName,
+        room.currentStage
+      );
+      return { event };
     }),
 
   // Pawn cards (give up 2 cards to avoid adversity)

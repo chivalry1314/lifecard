@@ -6,7 +6,8 @@ export interface RoomPlayer {
   acceptedEvents?: number;
   lastActionAtStage?: number;
   lastAction?: "accept" | "pawn" | null;
-  choices?: { stageIndex: number; type: "accept" | "pawn"; cards: string[] }[];
+  stageEvents?: Record<number, string>;
+  choices?: { stageIndex: number; type: "accept" | "pawn"; cards: string[]; event?: string }[];
   updatedAt?: string | Date;
 }
 

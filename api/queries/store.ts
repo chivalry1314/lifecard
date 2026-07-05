@@ -41,5 +41,6 @@ export const createPlayer = backend.createPlayer;
 export const updatePlayerBaseCards = backend.updatePlayerBaseCards;
 export const getPlayer = backend.getPlayer;
 export const listPlayersByRoom = backend.listPlayersByRoom;
+export const revealPlayerEvent = backend.revealPlayerEvent;
 export const pawnCards = backend.pawnCards;
 export const acceptAdversity = backend.acceptAdversity;

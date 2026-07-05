@@ -124,6 +124,7 @@ export async function createPlayer(
     acceptedEvents: 0,
     lastActionAtStage: -1,
     lastAction: null,
+    stageEvents: {},
     choices: [],
     createdAt: now,
     updatedAt: now,
@@ -165,6 +166,29 @@ export async function listPlayersByRoom(roomId: string): Promise<PlayerDoc[]> {
   return players.filter((p) => p.roomId === roomId);
 }
 
+export async function revealPlayerEvent(
+  roomId: string,
+  playerName: string,
+  stageIndex: number
+): Promise<string> {
+  await ensureInit();
+  const player = await getPlayer(roomId, playerName);
+  if (!player) {
+    throw new Error("Player not found");
+  }
+
+  const existing = player.stageEvents?.[stageIndex];
+  if (existing) return existing;
+
+  // Import getRandomEvent from cloudbase to avoid duplication
+  const { getRandomEvent } = await import("./cloudbase");
+  const event = getRandomEvent(stageIndex);
+  player.stageEvents = { ...player.stageEvents, [stageIndex]: event };
+  player.updatedAt = new Date();
+  await save();
+  return event;
+}
+
 export async function pawnCards(
   roomId: string,
   playerName: string,
@@ -175,6 +199,11 @@ export async function pawnCards(
   const player = await getPlayer(roomId, playerName);
   if (!player) {
     throw new Error("Player not found");
+  }
+
+  const event = player.stageEvents?.[stageIndex];
+  if (!event) {
+    throw new Error("本阶段尚未抽取挫折事件");
   }
 
   for (const card of cards) {
@@ -189,7 +218,7 @@ export async function pawnCards(
   player.lastAction = "pawn";
   player.choices = [
     ...(player.choices || []).filter((c) => c.stageIndex !== stageIndex),
-    { stageIndex, type: "pawn", cards },
+    { stageIndex, type: "pawn", cards, event },
   ];
   player.updatedAt = new Date();
   await save();
@@ -208,12 +237,17 @@ export async function acceptAdversity(
     throw new Error("Player not found");
   }
 
+  const event = player.stageEvents?.[stageIndex];
+  if (!event) {
+    throw new Error("本阶段尚未抽取挫折事件");
+  }
+
   player.acceptedEvents = (player.acceptedEvents || 0) + 1;
   player.lastActionAtStage = stageIndex;
   player.lastAction = "accept";
   player.choices = [
     ...(player.choices || []).filter((c) => c.stageIndex !== stageIndex),
-    { stageIndex, type: "accept", cards: [] },
+    { stageIndex, type: "accept", cards: [], event },
   ];
   player.updatedAt = new Date();
   await save();

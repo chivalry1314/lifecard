@@ -36,7 +36,9 @@ export interface PlayerDoc {
   acceptedEvents: number;
   lastActionAtStage: number;
   lastAction: "pawn" | "accept" | null;
-  choices: { stageIndex: number; type: "accept" | "pawn"; cards: string[] }[];
+  /** 每个阶段抽到的挫折事件，key 为阶段索引 */
+  stageEvents: Record<number, string>;
+  choices: { stageIndex: number; type: "accept" | "pawn"; cards: string[]; event?: string }[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -155,6 +157,7 @@ export async function createPlayer(
     acceptedEvents: 0,
     lastActionAtStage: -1,
     lastAction: null,
+    stageEvents: {},
     choices: [],
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -201,6 +204,31 @@ export async function listPlayersByRoom(roomId: string): Promise<PlayerDoc[]> {
   return docs as unknown as PlayerDoc[];
 }
 
+export async function revealPlayerEvent(
+  roomId: string,
+  playerName: string,
+  stageIndex: number
+): Promise<string> {
+  const player = await getPlayer(roomId, playerName);
+  if (!player) throw new Error("Player not found");
+
+  const existing = player.stageEvents?.[stageIndex];
+  if (existing) return existing;
+
+  const event = getRandomEvent(stageIndex);
+  await updateDocuments(
+    PLAYERS_COLLECTION,
+    { roomId, playerName },
+    {
+      $set: {
+        [`stageEvents.${stageIndex}`]: event,
+        updatedAt: new Date(),
+      },
+    }
+  );
+  return event;
+}
+
 export async function pawnCards(
   roomId: string,
   playerName: string,
@@ -209,6 +237,9 @@ export async function pawnCards(
 ): Promise<{ baseCards: string[]; pawnedCards: string[] }> {
   const player = await getPlayer(roomId, playerName);
   if (!player) throw new Error("Player not found");
+
+  const event = player.stageEvents?.[stageIndex];
+  if (!event) throw new Error("本阶段尚未抽取挫折事件");
 
   for (const card of cards) {
     if (!player.baseCards.includes(card)) {
@@ -220,7 +251,7 @@ export async function pawnCards(
   const newPawnedCards = [...player.pawnedCards, ...cards];
   const newChoices = [
     ...(player.choices || []).filter((c) => c.stageIndex !== stageIndex),
-    { stageIndex, type: "pawn" as const, cards },
+    { stageIndex, type: "pawn" as const, cards, event },
   ];
 
   await updateDocuments(
@@ -249,9 +280,12 @@ export async function acceptAdversity(
   const player = await getPlayer(roomId, playerName);
   if (!player) throw new Error("Player not found");
 
+  const event = player.stageEvents?.[stageIndex];
+  if (!event) throw new Error("本阶段尚未抽取挫折事件");
+
   const newChoices = [
     ...(player.choices || []).filter((c) => c.stageIndex !== stageIndex),
-    { stageIndex, type: "accept" as const, cards: [] },
+    { stageIndex, type: "accept" as const, cards: [], event },
   ];
 
   await updateDocuments(

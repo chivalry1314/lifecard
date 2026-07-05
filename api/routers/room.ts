@@ -4,7 +4,6 @@ import {
   createRoom,
   getRoom,
   updateRoomStatus,
-  getRandomEvent,
   listPlayersByRoom,
   STAGES,
 } from "../queries/store";
@@ -63,13 +62,11 @@ export const roomRouter = createRouter({
         );
       }
 
-      const currentEvent = getRandomEvent(0);
       await updateRoomStatus(input.roomId, {
         status: "playing",
         currentStage: 0,
-        currentEvent,
       });
-      return { success: true, currentEvent };
+      return { success: true };
     }),
 
   // Advance to next stage
@@ -111,12 +108,10 @@ export const roomRouter = createRouter({
         return { finished: true, stage: room.currentStage };
       }
 
-      const currentEvent = getRandomEvent(nextStage);
       await updateRoomStatus(input.roomId, {
         currentStage: nextStage,
-        currentEvent,
       });
-      return { finished: false, stage: nextStage, currentEvent };
+      return { finished: false, stage: nextStage };
     }),
 
   // Finish the game

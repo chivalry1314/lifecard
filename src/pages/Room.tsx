@@ -185,6 +185,16 @@ export default function Room() {
     },
   });
 
+  const revealEventMutation = trpc.player.revealEvent.useMutation({
+    onSuccess: () => {
+      playerQuery.refetch();
+      playersQuery.refetch();
+    },
+    onError: (err) => {
+      error("抽卡失败", err.message);
+    },
+  });
+
   // Auto-join on mount
   useEffect(() => {
     if (
@@ -233,8 +243,10 @@ export default function Room() {
 
   const room = roomQuery.data;
   const player = playerQuery.data;
-  const currentEvent = stageQuery.data?.event || "";
   const stageName = stageQuery.data?.name || "";
+  const stageSubtitle = getStageSubtitle(room?.currentStage ?? -1);
+  const currentPlayerEvent = player?.stageEvents?.[room?.currentStage ?? -1] || "";
+  const hasRevealedEvent = !!currentPlayerEvent;
 
   const players = useMemo(
     () =>
@@ -259,6 +271,9 @@ export default function Room() {
   );
 
   const currentStage = room?.currentStage ?? -1;
+  const revealedCount = players.filter(
+    (p) => p.stageEvents && p.stageEvents[currentStage]
+  ).length;
   const actedCount = players.filter(
     (p) => p.lastActionAtStage === currentStage
   ).length;
@@ -314,6 +329,10 @@ export default function Room() {
       return;
     }
     if (hasActed) return;
+    if (!hasRevealedEvent) {
+      error("请先抽取本阶段的挫折卡牌");
+      return;
+    }
     setModal({
       open: true,
       title: "直面当前挫折",
@@ -322,10 +341,23 @@ export default function Room() {
         acceptMutation.mutate({ roomId: roomId!, playerName, playerToken });
       },
     });
-  }, [playerToken, hasActed, roomId, playerName, acceptMutation, error]);
+  }, [playerToken, hasActed, hasRevealedEvent, roomId, playerName, acceptMutation, error]);
+
+  const handleRevealEvent = useCallback(() => {
+    if (!playerToken) {
+      error("玩家身份验证失败");
+      return;
+    }
+    if (hasRevealedEvent || revealEventMutation.isPending) return;
+    revealEventMutation.mutate({ roomId: roomId!, playerName, playerToken });
+  }, [playerToken, hasRevealedEvent, revealEventMutation, roomId, playerName, error]);
 
   const startPawnMode = useCallback(() => {
     if (hasActed) return;
+    if (!hasRevealedEvent) {
+      error("请先抽取本阶段的挫折卡牌");
+      return;
+    }
     if ((player?.baseCards.length || 0) < 2) {
       error("你的卡牌余额已不足2张，别无选择，只能硬撑过命运难关...");
       return;
@@ -333,7 +365,7 @@ export default function Room() {
     setSelectedCards([]);
     setPawnMode(true);
     info("请在底牌区域轻触挑选 2 张珍贵卡牌");
-  }, [hasActed, player, error, info]);
+  }, [hasActed, hasRevealedEvent, player, error, info]);
 
   const toggleCardSelection = useCallback(
     (card: string) => {
@@ -621,12 +653,24 @@ export default function Room() {
           })()
         )}
 
-        {room.status === "playing" && (
+        {room.status === "playing" && !hasRevealedEvent && (
+          <EventDrawView
+            stageName={stageName}
+            stageSubtitle={stageSubtitle}
+            currentStage={room.currentStage}
+            revealedCount={revealedCount}
+            playerCount={players.length}
+            onReveal={handleRevealEvent}
+            isRevealing={revealEventMutation.isPending}
+          />
+        )}
+
+        {room.status === "playing" && hasRevealedEvent && (
           <ActivePlay
             stageName={stageName}
-            stageSubtitle={getStageSubtitle(room.currentStage)}
+            stageSubtitle={stageSubtitle}
             currentStage={room.currentStage}
-            currentEvent={currentEvent}
+            currentEvent={currentPlayerEvent}
             players={players}
             isHost={isHost}
             hasActed={hasActed}
@@ -1014,6 +1058,110 @@ function InitialCardSelector({
   );
 }
 
+interface EventDrawViewProps {
+  stageName: string;
+  stageSubtitle: string;
+  currentStage: number;
+  revealedCount: number;
+  playerCount: number;
+  onReveal: () => void;
+  isRevealing: boolean;
+}
+
+function EventDrawView({
+  stageName,
+  stageSubtitle,
+  currentStage,
+  revealedCount,
+  playerCount,
+  onReveal,
+  isRevealing,
+}: EventDrawViewProps) {
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const [revealing, setRevealing] = useState(false);
+
+  const handleSelect = (index: number) => {
+    if (revealing || isRevealing) return;
+    setSelectedIndex(index);
+    setRevealing(true);
+    setTimeout(() => {
+      onReveal();
+    }, 800);
+  };
+
+  return (
+    <section className="w-full space-y-4 animate-fade-in">
+      {/* Stage header */}
+      <div className="bg-white rounded-2xl p-3.5 shadow-soft-warm border border-rose-50/50 flex items-center justify-between">
+        <div className="flex items-center space-x-2">
+          <span className="text-pawn-clay text-lg">
+            <GlobeIcon />
+          </span>
+          <div>
+            <h4 className="serif-title font-bold text-sm text-pawn-dark">{stageName}</h4>
+            <p className="text-[8px] text-stone-400 uppercase tracking-widest">{stageSubtitle}</p>
+          </div>
+        </div>
+        <div className="flex items-center space-x-1.5">
+          {[0, 1, 2, 3, 4].map((idx) => {
+            let cls = "w-2 h-2 rounded-full transition-all duration-300 ";
+            if (idx === currentStage) cls += "bg-pawn-rose scale-125 shadow";
+            else if (idx < currentStage) cls += "bg-pawn-sage";
+            else cls += "bg-stone-200";
+            return <div key={idx} className={cls} />;
+          })}
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl p-4 shadow-soft-warm border border-rose-50/50 text-center space-y-3">
+        <div className="w-10 h-10 bg-pawn-cream rounded-full flex items-center justify-center mx-auto text-pawn-rose text-base">
+          <ShuffleIcon />
+        </div>
+        <div className="space-y-1">
+          <h2 className="serif-title text-base font-bold text-pawn-dark">命运抽卡</h2>
+          <p className="text-[11px] text-stone-500">本阶段的挫折卡牌已洗好，请抽取一张</p>
+          <p className="text-[10px] text-stone-400">
+            已有 {revealedCount}/{playerCount} 位旅人抽卡
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-3 gap-2">
+        {[0, 1, 2, 3, 4, 5].map((index) => (
+          <button
+            key={index}
+            onClick={() => handleSelect(index)}
+            disabled={revealing || isRevealing}
+            className={`relative h-20 sm:h-24 rounded-lg border-2 transition-all duration-500 active:scale-95 flex flex-col items-center justify-center ${
+              selectedIndex === index
+                ? "bg-rose-50 border-pawn-rose shadow-sm shadow-rose-100 [transform:rotateY(180deg)]"
+                : selectedIndex !== null
+                  ? "bg-stone-100 border-stone-200 opacity-50"
+                  : "bg-gradient-to-b from-amber-50 to-pawn-cream border-amber-200 hover:border-pawn-gold hover:shadow-sm"
+            }`}
+          >
+            <span className={`text-lg transition-opacity duration-300 ${selectedIndex === index ? "opacity-0" : "opacity-100"}`}>
+              🎴
+            </span>
+            <span className={`text-[8px] font-bold mt-0.5 transition-opacity duration-300 ${selectedIndex === index ? "opacity-0" : "opacity-100"}`}>
+              命运之{["壹", "贰", "叁", "肆", "伍", "陆"][index]}
+            </span>
+            {selectedIndex === index && (revealing || isRevealing) && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-3.5 h-3.5 border-2 border-pawn-rose border-t-transparent rounded-full animate-spin" />
+              </div>
+            )}
+          </button>
+        ))}
+      </div>
+
+      <p className="text-center text-xs text-stone-400">
+        点击任意一张卡牌，抽取属于你这个阶段的挫折事件
+      </p>
+    </section>
+  );
+}
+
 function ActivePlay({
   stageName,
   stageSubtitle,
@@ -1204,9 +1352,30 @@ function ActivePlay({
                 {expanded && (
                   <div className="px-2 pb-2 animate-fade-in">
                     <div className="bg-white rounded-xl p-2.5 border border-rose-100/40 space-y-2">
-                      {/* Current stage choice */}
-                      <div>
-                        <span className="text-[9px] font-bold text-pawn-dark block mb-1">
+                      {/* Current stage event & choice */}
+                      <div className="space-y-1.5">
+                        <span className="text-[9px] font-bold text-pawn-dark block">
+                          本阶段挫折
+                        </span>
+                        {(() => {
+                          const event = p.stageEvents?.[currentStage];
+                          if (!event) {
+                            return (
+                              <span className="text-[9px] text-stone-400 italic">
+                                尚未抽卡
+                              </span>
+                            );
+                          }
+                          return (
+                            <div className="text-[9px] text-pawn-clay bg-rose-50 inline-block px-2 py-0.5 rounded-md border border-rose-100">
+                              {event}
+                            </div>
+                          );
+                        })()}
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <span className="text-[9px] font-bold text-pawn-dark block">
                           本阶段选择
                         </span>
                         {(() => {
@@ -1403,6 +1572,18 @@ function SparkleIcon() {
   return (
     <svg className="w-3.5 h-3.5 text-pawn-rose" viewBox="0 0 24 24" fill="currentColor">
       <path d="M12 3l1.912 5.886 6.182.046-4.978 3.659 1.874 5.899-4.99-3.642-4.99 3.642 1.874-5.899-4.978-3.659 6.182-.046z" />
+    </svg>
+  );
+}
+
+function ShuffleIcon() {
+  return (
+    <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="16 3 21 3 21 8" />
+      <line x1="4" y1="20" x2="21" y2="3" />
+      <polyline points="21 16 21 21 16 21" />
+      <line x1="15" y1="15" x2="21" y2="21" />
+      <line x1="4" y1="4" x2="9" y2="9" />
     </svg>
   );
 }

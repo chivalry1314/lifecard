@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { createRouter, publicProcedure, throwAppError } from "../middleware";
-import { getRoom, STAGES, getRandomEvent } from "../queries/store";
+import { getRoom, STAGES } from "../queries/store";
 import { Errors } from "../../contracts/errors";
 import { roomIdSchema } from "../lib/schemas";
 
@@ -20,19 +20,12 @@ export const gameRouter = createRouter({
         throwAppError(Errors.notFound("当前阶段不存在"));
       }
 
-      // Backfill event for legacy rooms / safety
-      if (!room.currentEvent && stageIndex >= 0) {
-        return {
-          ...stage,
-          index: stageIndex,
-          event: getRandomEvent(stageIndex),
-        };
-      }
-
+      // Events are now per-player; stageInfo only returns stage metadata.
+      // The shared currentEvent field is kept for legacy room compatibility.
       return {
         ...stage,
         index: stageIndex,
-        event: room.currentEvent,
+        event: "",
       };
     }),
 
