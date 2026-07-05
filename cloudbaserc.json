@@ -15,5 +15,23 @@
         "ALLOWED_ORIGINS": "{{env.ALLOWED_ORIGINS}}"
       }
     }
-  ]
+  ],
+  "hosting": {
+    "public": "./dist/public",
+    "ignore": [
+      ".git",
+      "node_modules",
+      "cloudfunctions"
+    ],
+    "rewrites": [
+      {
+        "source": "/api/*",
+        "function": "api"
+      },
+      {
+        "source": "/*",
+        "destination": "/index.html"
+      }
+    ]
+  }
 }

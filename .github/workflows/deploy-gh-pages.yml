@@ -1,8 +1,8 @@
 name: Deploy Frontend to GitHub Pages
 
+# 当前主方案是 CloudBase 免费静态托管，此工作流暂时改为手动触发。
+# 如果确认 CloudBase 方案可用，可以直接删除此文件。
 on:
-  push:
-    branches: [main, master]
   workflow_dispatch:
 
 permissions:

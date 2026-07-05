@@ -1,8 +1,9 @@
+# 一体化部署：此工作流只部署后端云函数，前端静态托管由 deploy-cloudbase-hosting.yml 处理。
 name: Deploy API to CloudBase Function
 
+# 当前主方案是 CloudBase 免费静态托管，此工作流暂时改为手动触发。
+# 如后续切换到自定义域名一体化方案，可恢复 push 触发。
 on:
-  push:
-    branches: [main, master]
   workflow_dispatch:
 
 jobs:
