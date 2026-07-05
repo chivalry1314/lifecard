@@ -21070,7 +21070,13 @@ var app_default = app;
 
 // edgeone/api.ts
 async function onRequest(context) {
-  return app_default.fetch(context.request);
+  const { request } = context;
+  if (!request.signal) {
+    const controller = new AbortController();
+    const patchedRequest = new Request(request, { signal: controller.signal });
+    return app_default.fetch(patchedRequest);
+  }
+  return app_default.fetch(request);
 }
 export {
   onRequest
